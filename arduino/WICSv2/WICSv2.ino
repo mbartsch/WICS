@@ -153,8 +153,6 @@ void receiveEvent(int howMany)
     zonetimer[zone]=runtime.toInt()*1000;
     zoneend[zone]=zonebegin[zone]+zonetimer[zone];
     
-    //String runtime=String(command[3])+String(command[4])+String(command[5]);
-    //setTimerZone(String(command[2]).toInt(),runtime.toInt());
   };
   if (String(command[0]) == "C" && String(command[1]) == "N") 
   { 
@@ -163,6 +161,18 @@ void receiveEvent(int howMany)
     int zone=String(command[2]).toInt();
     zoneend[zone]=0;
   };
+  if (String(command[0]) == "S" && String(command[1]) == "Z")
+  {
+    int zone = (String(command[2]).toInt()-1);
+    String localStatus;
+    if (zone > 4) { 
+      localStatus="SZEE"; 
+    } else {
+      int status = digitalRead(zoneport[zone]);
+      localStatus = "SZ" + String(zone) + String(status);
+    }
+    localStatus.toCharArray(sendStatus,31);
+  }
 }
 
 
