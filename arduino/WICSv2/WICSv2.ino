@@ -7,22 +7,24 @@
 #define WICSVER "0.2"
 #undef REALRTC
 //#define REALRTC
-#define ZONE1   12
-#define ZONE2   11
-#define ZONE3   10
-#define ZONE4   9
-#define RAIN1   D4
-#define ECHO    D5
-#define TRIGGER D6
-#define THERM   A0
-#define SDA     A4
-#define SCL     A5
+#define ZONE1     12
+#define ZONE2     11
+#define ZONE3     10
+#define ZONE4      9
+#define RAIN1      4
+#define MOISTURE1  7
+#define ECHO      D5
+#define TRIGGER   D6
+#define THERM     A0
+#define SDA       A4
+#define SCL       A5
 
-int outpins[] = {12,11,10,9};
-int inpins[] = {8};
+int outpins[] = {ZONE1,ZONE2,ZONE3,ZONE4};
+int inpins[] = {8,RAIN1, MOISTURE1};
 int totout = 4;
-int totin = 1;
+int totin = 3;
 int totzones = 4;
+int newRequest = 0;
 unsigned long zonetimer [] = {0,0,0,0};
 unsigned long zonebegin [] = {0,0,0,0};
 unsigned long zonestart [] = {0,0,0,0};
@@ -35,26 +37,29 @@ void setup() {
   Serial.begin(9600);
   Serial.print(F("This is WICS Slave Version "));
   Serial.println(F(WICSVER));
+  Serial.println(F("Initializing...."));
   pinsToOut();
+  pinsToIn();
   delay(2000);
   Wire.begin(I2CADDR);
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
+  Serial.println(F("Initializing.... Done!"));
 }
 
 void loop () {
-   Serial.println(millis());
-   Serial.println(freeRam());
+   // Serial.println(millis());
+   // Serial.println(freeRam());
    for (int zone = 0 ; zone < totzones ; zone++)
    {
-     Serial.print(F("Checking zone "));
+     /*Serial.print(F("Checking zone "));
      Serial.print(zone);
      Serial.print(F(" Status is "));
-     Serial.println(zonestart[zone]);
+     Serial.println(zonestart[zone]);*/
      if (zonestart[zone] == 1)
      {
        digitalWrite(zoneport[zone],LOW);
-    /*   Serial.print("Zone ID ");
+    /* Serial.print("Zone ID ");
        Serial.println(zone);
        Serial.print("Zone Begin ");
        Serial.println(zonebegin[zone]);
@@ -76,12 +81,12 @@ void loop () {
 
 };
 
-    int freeRam ()
-    {
-    extern int __heap_start, *__brkval;
-    int v;
-    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
-    }
+int freeRam ()
+{
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
     
 void setTimerZone(int zone, unsigned long duration)
 {
@@ -109,13 +114,29 @@ void pinsToOut(){
 }
 
 
+int rainStatus() {
+  unsigned int rainStatus;
+  Serial.println("It is Rainint?");
+  rainStatus=digitalRead(RAIN1);
+  Serial.println(rainStatus);
+  return rainStatus;
+}
+
+int moistureStatus() {
+  unsigned int moistureStatus;
+  Serial.println("It is Soil Wet?");
+  moistureStatus=digitalRead(MOISTURE1);
+  Serial.println(moistureStatus);
+  return moistureStatus;
+}
+
 void pinsToIn(){
   for (int in = 0 ; in < totin; in++)
   {
     Serial.print("Setting Pin ");
     Serial.print(inpins[in]);
     Serial.println(" Input");
-    pinMode(inpins[in],INPUT);
+    pinMode(inpins[in],INPUT_PULLUP);
     //digitalWrite(inpins[in],HIGH);
   }
 }
@@ -136,9 +157,6 @@ void receiveEvent(int howMany)
     receiveByte++;                       // increase index by 1
   }
   
-  //pin = String(command[1]) + String(command[2]);                          // combine byte 2 and 3 in order to get the pin number
-  //awValue = String(command[4]) + String(command[5]) + String(command[6]); // combine byte 5, 6 and 7 in order to get the analogWrite value
-  //awValueVal = awValue.toInt();                                           // convert the awValue string to a value
   Serial.print("Command is = ");
   Serial.println(String(command).substring(0,receiveByte));
   if (String(command[0]) == "O" && String(command[1]) == "N") 
@@ -161,17 +179,50 @@ void receiveEvent(int howMany)
     int zone=String(command[2]).toInt();
     zoneend[zone]=0;
   };
+  
+  //Zone Status
   if (String(command[0]) == "S" && String(command[1]) == "Z")
   {
-    int zone = (String(command[2]).toInt()-1);
+    int zone = (String(command[2]).toInt());
     String localStatus;
     if (zone > 4) { 
       localStatus="SZEE"; 
     } else {
-      int status = digitalRead(zoneport[zone]);
+      int status = digitalRead(zoneport[zone-1]);
+      if (status == 0 )
+      {
+        status = 1;
+      } else {
+        status = 0;
+      }
       localStatus = "SZ" + String(zone) + String(status);
     }
     localStatus.toCharArray(sendStatus,31);
+    Serial.print("Status = |");
+    Serial.print(sendStatus);
+    Serial.println("|");
+    newRequest = 1;
+  }
+  
+  //Rain Status
+  if (String(command[0]) == "S" && String(command[1]) == "R")
+  {
+    String localStatus="SR" + String(rainStatus());
+    localStatus.toCharArray(sendStatus,31);
+    Serial.print("Status = |");
+    Serial.print(sendStatus);
+    Serial.println("|");
+    newRequest = 1;
+  }
+    //Rain Status
+  if (String(command[0]) == "S" && String(command[1]) == "M")
+  {
+    String localStatus="SM" + String(moistureStatus());
+    localStatus.toCharArray(sendStatus,31);
+    Serial.print("Status = |");
+    Serial.print(sendStatus);
+    Serial.println("|");
+    newRequest = 1;
   }
 }
 
@@ -179,11 +230,18 @@ void receiveEvent(int howMany)
 
 void requestEvent() 
 {
-    Wire.write(sendStatus[index]);
-    ++index;
-    if (index >= 30) {
-         index = 0;
-    }
-}
+  if (newRequest == 1) 
+  {
+    newRequest = 0;
+    index      = 0;
+  }
+
+  Wire.write(sendStatus[index]);
+  Serial.println("Wire.write()");
+  ++index;
+  if (index >= 30) {
+       index = 0;
+  }
+ }
 
 
