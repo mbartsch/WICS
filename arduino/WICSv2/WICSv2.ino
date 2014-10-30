@@ -13,16 +13,16 @@
 #define ZONE4      9
 #define RAIN1      4
 #define MOISTURE1  7
-#define ECHO      D5
-#define TRIGGER   D6
+#define ECHO      6
+#define TRIGGER   5
 #define THERM     A0
 #define SDA       A4
 #define SCL       A5
 
-int outpins[] = {ZONE1,ZONE2,ZONE3,ZONE4};
-int inpins[] = {8,RAIN1, MOISTURE1};
-int totout = 4;
-int totin = 3;
+int outpins[] = {ZONE1,ZONE2,ZONE3,ZONE4,TRIGGER};
+int inpins[] = {8,RAIN1, MOISTURE1,INPUT};
+int totout = 5;
+int totin = 4;
 int totzones = 4;
 int newRequest = 0;
 unsigned long zonetimer [] = {0,0,0,0};
@@ -76,6 +76,7 @@ void loop () {
        }
      }
    }
+   Serial.println(String(distanceSensor()));
      // if (zonestart[zone]==1) && (millis()-zonebegin[zone] > zonetime[zone]
    delay(1000);
 
@@ -113,6 +114,23 @@ void pinsToOut(){
   }
 }
 
+int distanceSensor() 
+{
+  long duration, distance;
+  digitalWrite(TRIGGER,HIGH);
+  delayMicroseconds(1000);
+  digitalWrite(TRIGGER,LOW);
+  duration = pulseIn(ECHO, HIGH);
+  //Serial.println(duration);
+  distance = (duration/2) / 29.1;
+  if ( distance >= 300 || distance <= 0 )
+  {
+    //Serial.println("Out of Range");
+    return 0;
+  } else {
+    return String(distance).toInt();
+  }
+}
 
 int rainStatus() {
   unsigned int rainStatus;
@@ -133,9 +151,9 @@ int moistureStatus() {
 void pinsToIn(){
   for (int in = 0 ; in < totin; in++)
   {
-    Serial.print("Setting Pin ");
+    Serial.print(F("Setting Pin "));
     Serial.print(inpins[in]);
-    Serial.println(" Input");
+    Serial.println(F(" Input"));
     pinMode(inpins[in],INPUT_PULLUP);
     //digitalWrite(inpins[in],HIGH);
   }
@@ -148,8 +166,8 @@ void receiveEvent(int howMany)
   String mode = "";                      // initialize mode variable for holding the mode
   String pin = "";                       // initialize pin variable for holding the pin number as a String
   String awValue = "";                   // intitalize the variable for holding the analogWrite value
-  int pinVal;                            // inititalize the variable for holding the pin number as integer
-  int awValueVal;                        // initialize the variable for holding the analog write value as integer (only PWM pins!)   
+  //int pinVal;                            // inititalize the variable for holding the pin number as integer
+  //int awValueVal;                        // initialize the variable for holding the analog write value as integer (only PWM pins!)   
     
   while(Wire.available())                // loop through all incoming bytes
   {
@@ -218,6 +236,28 @@ void receiveEvent(int howMany)
   if (String(command[0]) == "S" && String(command[1]) == "M")
   {
     String localStatus="SM" + String(moistureStatus());
+    localStatus.toCharArray(sendStatus,31);
+    Serial.print("Status = |");
+    Serial.print(sendStatus);
+    Serial.println("|");
+    newRequest = 1;
+  }
+  
+  if (String(command[0]) == "S" && String(command[1]) == "D")
+  {
+    String distance = "0";
+    String temp;;
+    distance=String(distanceSensor());
+    if (distance.toInt() < 10) 
+    {
+      temp = "00" + distance;
+      distance = temp;
+    } else if (distance.toInt() < 100)
+    {
+      temp = "0" + distance;
+      distance = temp;
+    }
+    String localStatus="SD" + distance;
     localStatus.toCharArray(sendStatus,31);
     Serial.print("Status = |");
     Serial.print(sendStatus);
