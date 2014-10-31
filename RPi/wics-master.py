@@ -73,8 +73,9 @@ def pinString(pin):
     pin = "0"+pin;
   return pin
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------
-# this routine send a request to the Arduino to provide a 30 byte status update, return all 30 bytes
+# -----------------------------------------------------------------------------
+# this routine send a request to the Arduino to provide a 30 byte status 
+# update, return all 30 bytes
 
 def getStatus(device,bytes):
   status = ""
@@ -85,7 +86,7 @@ def getStatus(device,bytes):
   return status
 
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # This will return the rain sensor status
 # Arduino will return a string like
 # SR1 = No Rain Drops
@@ -104,7 +105,7 @@ def getRainSensorStatus(device):
   return status
 
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # This will return the rain sensor status
 # Arduino will return a string like
 # SR1 = No Rain Drops
@@ -122,7 +123,7 @@ def getMoistureSensorStatus(device):
     status=2
   return status
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # This will return the soil moisture status
 # Arduino will return a string like
 # SM0 = No Soil Moisture 
@@ -140,7 +141,7 @@ def getSoilMoistureStatus(device):
     status=2
   return status
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # This will return the rain sensor status
 # Arduino will return a string like
 # SZXO = Zone X is open
@@ -170,6 +171,19 @@ def getZoneStatus(device,zone):
     status=2
   return int(status[3])
 
+
+def getDistance(device):
+  status = "-1"
+  sendMessage(device,'S','D')
+  time.sleep(0.01)
+  status=getStatus(device,6)
+  if debug:
+    print("Status = " + status)
+  if (status[:2] == "SD"):
+    if debug:
+      print("Status[2:5] = " + status[2:5])
+  return int(status[2:5])
+  
 # ------------------------------------------------------------------------------------------------------------------------------------------------
 # this is where the main program starts
 """
@@ -190,6 +204,8 @@ Valid commands are:
     - Return Rain Sensor status
   * SM
     - Return Soil Moisture status
+  * SD
+    - Return Distance measures
 
 Valid Parameters
   * Y = Zone
@@ -200,10 +216,10 @@ lcd.command(lcd.CMD_Display_Control | lcd.OPT_Enable_Display)
 lcd.backLightOn()
 lcd.writeString("WICS v0.2")
 while True:
+  print(getDistance(device))
+"""
   print(getRainSensorStatus(device))
   print(getMoistureSensorStatus(device))
-
-"""
   zones=(getAllZoneStatus(device))
   lcd.backLightOn()
   lcd.setPosition(1, 0)
